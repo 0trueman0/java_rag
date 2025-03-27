@@ -29,6 +29,10 @@ spring:
   ai:
     ollama:
       base-url: http://117.72.12.206:11434
+      embedding:
+        options:
+          num-batch: 512
+          model: nomic-embed-text
 
 # Redis
 redis:
