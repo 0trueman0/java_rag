@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col">
+<!-- 聊天窗口 -->
+<div class="flex-1 p-4 overflow-y-auto" id="chatContainer">
+    <!-- 消息模板 -->
+</div>
+
+<!-- 输入区域 -->
+<div class="border-t border-gray-300 p-4 flex space-x-2 bg-white">
+    <input type="text" id="messageInput"
+           class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+           placeholder="输入消息...">
+    <button onclick="sendMessage()"
+            class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+        发送
+    </button>
+</div>
+
+<script>
+    let eventSource = null;
+    let currentResponseElement = null; // 当前响应元素
+
+    function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+        if (!message) return;
+
+        // 清空输入框
+        input.value = '';
+
+        // 添加用户消息到聊天窗口
+        addMessage('user', message);
+
+        // 构建API请求URL
+        const apiUrl = `http://localhost:8090/api/v1/ollama/generate_stream?model=deepseek-r1:1.5b&message=${encodeURIComponent(message)}`;
+
+        // 关闭之前的连接
+        if (eventSource) {
+            eventSource.close();
+        }
+
+        // 创建新的EventSource连接
+        eventSource = new EventSource(apiUrl);
+
+        // 显示加载状态
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.className = 'text-gray-500 text-center p-2';
+        loadingDiv.textContent = '正在思考...';
+        document.getElementById('chatContainer').appendChild(loadingDiv);
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const content = data.result.output?.content || '';
+            const finishReason = data.result.metadata?.finishReason;
+
+            // 移除加载状态
+            const loading = document.getElementById('loading');
+            if (loading) loading.remove();
+
+            // 如果是流式响应，逐字追加到当前元素
+            if (currentResponseElement) {
+                currentResponseElement.textContent += content;
+            } else {
+                // 创建一个新的消息元素并添加到聊天窗口
+                currentResponseElement = createAssistantMessage(content);
+                document.getElementById('chatContainer').appendChild(currentResponseElement);
+            }
+
+            // 结束条件判断
+            if (finishReason === 'STOP') {
+                eventSource.close();
+                currentResponseElement = null; // 重置当前响应元素
+            }
+        };
+
+        eventSource.onerror = function(err) {
+            console.error('EventSource failed:', err);
+            if (eventSource) eventSource.close();
+            // 移除加载状态
+            const loading = document.getElementById('loading');
+            if (loading) loading.remove();
+            addMessage('system', '连接出错，请重试');
+        };
+    }
+
+    function addMessage(sender, content) {
+        const chatContainer = document.getElementById('chatContainer');
+
+        // 创建消息元素
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `mb-2 flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+
+        const bubbleClass = `p-3 rounded-lg max-w-md ${
+            sender === 'user' ? 'bg-blue-500 text-white' :
+                sender === 'assistant' ? 'bg-white border border-gray-300 text-gray-800' :
+                    'bg-red-100 text-red-600'
+        }`;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = bubbleClass;
+        contentDiv.textContent = content;
+
+        messageDiv.appendChild(contentDiv);
+        chatContainer.appendChild(messageDiv);
+
+        // 滚动到底部
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function createAssistantMessage(initialContent) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `mb-2 flex justify-start`;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = `p-3 rounded-lg max-w-md bg-white border border-gray-300 text-gray-800`;
+        contentDiv.textContent = initialContent;
+
+        messageDiv.appendChild(contentDiv);
+        return messageDiv;
+    }
+</script>
+</body>
+</html>
