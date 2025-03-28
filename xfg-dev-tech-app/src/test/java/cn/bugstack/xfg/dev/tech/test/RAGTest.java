@@ -42,7 +42,7 @@ public class RAGTest {
 
     @Test
     public void upload() {
-        TikaDocumentReader reader = new TikaDocumentReader("./data/file.text");
+        TikaDocumentReader reader = new TikaDocumentReader("C:\\Users\\JOJO\\IdeaProjects\\ai-rag-knowledge\\xfg-dev-tech-app\\src\\test\\resources\\data\\file.text");
 
         List<Document> documents = reader.get();
         List<Document> documentSplitterList = tokenTextSplitter.apply(documents);
